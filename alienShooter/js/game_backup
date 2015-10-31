@@ -1,0 +1,559 @@
+AlienGame.Game = function(){
+    
+};
+AlienGame.Game.prototype = {
+
+  //end tmpObject 
+      create : function(){
+        this.setBackground();
+        this.setPlayer();
+        this.setEnemiesSmall(AlienGame.ENEMY_CLASS.SMALL_ENEMY);
+        this.setEnemiesNormal(AlienGame.ENEMY_CLASS.NORMAL_ENEMY);
+        this.setEnemiesBig(AlienGame.ENEMY_CLASS.BIG_ENEMY);
+        this.setBullets();
+        this.setExplosions('explosion');
+        this.setPlayerIcon();
+        this.setText();
+          this.cursors = this.input.keyboard.createCursorKeys();
+      },
+    update : function(){
+      this.checkCollision(this.bulletPool,[this.enemySmallPool,this.enemyNormalPool,this.enemyBigPool],this.enemyHit);
+      this.checkCollision(this.lazeBulletPool,[this.enemySmallPool,this.enemyNormalPool,this.enemyBigPool],this.enemyHit);
+      this.checkCollision(this.missileBulletPool,[this.enemySmallPool,this.enemyNormalPool,this.enemyBigPool],this.enemyHit);
+      this.checkCollision(this.player,[this.bulletPoolItem,this.lazeBulletPoolItem,this.missileBulletPoolItem,this.supportPlayerPoolItem],this.playerPowerUp);
+      this.spawnEnemies(AlienGame.ENEMY_CLASS.SMALL_ENEMY,this.enemySmallPool);
+      this.spawnEnemies(AlienGame.ENEMY_CLASS.NORMAL_ENEMY,this.enemyNormalPool);
+      this.spawnEnemies(AlienGame.ENEMY_CLASS.BIG_ENEMY,this.enemyBigPool);    
+      this.enemyFire([this.enemyNormalPool,this.enemyBigPool]);
+      this.playerInput();
+      this.otherEffect();
+    },
+    render : function(){
+//      this.game.debug.spriteBounds(this.player,50,50);  
+        this.game.debug.body(this.player);
+        this.game.debug.text("loai vu khi : "  + this.player.wegaponType + " laze level : " + this.player.lazeBulletLevel + "spread Level :"  + this.player.spreadBulletLevel + "missile LEvel : " + this.player.missileBulletLevel,100,100);
+    },
+    
+    setBackground : function(){
+      this.bg = this.add.tileSprite(0, 0, this.game.width, this.game.height, 'bg');
+      this.bg.autoScroll(0,20);
+    },
+    playerInput : function(){
+//       
+        if(this.cursors.left.isDown){
+            this.player.play("flyLeft");
+            this.player.body.velocity.x = -AlienGame.PLAYER_CLASS.speed ;
+            
+        }else 
+        if(this.cursors.right.isDown){
+            this.player.play("flyRight");
+            this.player.body.velocity.x = AlienGame.PLAYER_CLASS.speed;
+        }else
+        if(this.cursors.up.isDown){
+            this.player.play("fly");
+            this.player.body.velocity.y = -AlienGame.PLAYER_CLASS.speed;
+        }else
+        if(this.cursors.down.isDown){
+            this.player.play("fly");
+            this.player.body.velocity.y = AlienGame.PLAYER_CLASS.speed;
+        }else {
+             this.player.play("fly");
+            this.player.body.velocity.x = 0;
+            this.player.body.velocity.y = 0 ;
+        } 
+        
+        if(this.input.keyboard.isDown(Phaser.Keyboard.Z)){
+           this.playerFire();
+        }
+        if(this.input.keyboard.isDown(Phaser.Keyboard.SPACE)){
+            this.playerSkill();
+        }
+    },
+    setPlayer : function(){
+        // 1 là đạn tỏa  ,  2 là đạn laze , 3 là đạn loại to 
+      this.player = this.add.sprite(this.game.width/2,this.game.height/2,'player');
+      this.player.animations.add('flyLeft',[0,5],20,true);
+      this.player.animations.add('flyRight',[4,9],20,true);
+      this.player.animations.add("fly",[2,7],20,false);
+      this.player.play("fly");  
+        
+      this.physics.enable(this.player);
+      this.player.anchor.setTo(0.5,0.5);
+      this.player.scale.setTo(2,2);
+     this.player.body.collideWorldBounds = true;
+     this.player.body.setSize(10,10,0,-10);
+   
+     this.player.wegaponType = 0 ;  //mac dinh la dan cui  
+//     this.player.wegaponLevel = 3;
+     this.player.nextShotAt = 0 ;
+        // 0 - normalBullet;
+        //1 - dan toa : 
+    this.player.spreadBulletLevel =1;
+    this.player.spreadBulletMaxLevel = 3;
+        //2 - dan laze :
+    this.player.lazeBulletLevel = 1;
+    this.player.lazeBulletMaxLevel = 10 ;    
+        //3  - dan ten lua :
+    this.player.missileBulletLevel = 1 ;
+    this.player.missileBulletMaxLevel = 1;
+        
+    this.player.hp = AlienGame.PLAYER_CLASS.HP; 
+        // 4 - support 
+    this.player.supportPlayerState = null; //0 = DEAD  , 1 = ALive 
+    this.player.supportPlayerShotDelay = 0 ;    
+    },
+    setBullets : function(){
+          this.bulletPool = this.add.group();
+             this.bulletPool.enableBody = true;
+            this.bulletPool.physicsBodyType = Phaser.Physics.ARCADE;
+                 this.bulletPool.createMultiple(100,"normalBullet");
+                 this.bulletPool.setAll("anchor.x",0.5);
+                 this.bulletPool.setAll("anchor.y",0.5);
+                 this.bulletPool.setAll("outOfBoundsKill",true);
+                 this.bulletPool.setAll("checkWorldBounds",true);
+                 this.bulletPool.nextShotAt =  0;
+                 this.bulletPool.setAll("bulletDamage",1,false,false,0,true);
+                this.bulletPool.setAll("itemType","spread",false,false,0,true);
+            
+            this.lazeBulletPool = this.add.group();
+                this.lazeBulletPool.enableBody = true;//chu y : phải để enableBody ở trên cùng khi tạo group 
+                 this.lazeBulletPool.createMultiple(100,"lazeBullet");
+                 this.lazeBulletPool.setAll("anchor.x",0.5);
+                 this.lazeBulletPool.setAll("anchor.y",0.5);
+                 this.lazeBulletPool.setAll("outOfBoundsKill",true);
+                 this.lazeBulletPool.setAll("checkWorldBounds",true);
+                 this.lazeBulletPool.nextShotAt =  0;
+                this.lazeBulletPool.setAll("bulletDamage",AlienGame.PLAYER_CLASS.LAZE,false,false,0,true);
+                this.lazeBulletPool.setAll("itemType","laze",false,false,0,true);
+                    
+            this.missileBulletPool = this.add.group();
+                this.missileBulletPool.enableBody = true ;
+                this.missileBulletPool.createMultiple(50,"missileBullet");
+                this.missileBulletPool.setAll("anchor.x",0.5);
+                this.missileBulletPool.setAll("anchor.y",0.5);
+                this.missileBulletPool.setAll("outOfBoundsKill",true);
+                this.missileBulletPool.setAll("checkWorldBounds",true);
+                this.missileBulletPool.nextShotAt = 0;
+                this.missileBulletPool.setAll("bulletDamage",4,false,false,0,true);
+                this.missileBulletPool.setAll("itemType","missile",false,false,0,true);
+                
+                
+            this.supportPlayerPool = this.add.group();
+                 this.supportPlayerPool.enableBody = true;
+                this.supportPlayerPool.createMultiple(2,"supportPlayer");
+                this.supportPlayerPool.setAll("anchor.x",0.5);
+                this.supportPlayerPool.setAll("anchor.y",0.5);
+                this.supportPlayerPool.setAll("bulletDamage",1,false,false,0,true);
+                this.supportPlayerPool.setAll("itemType","support",false,false,0,true);
+                this.supportPlayerPool.nextShotAt = 0;
+                
+                
+            this.protectPlayer = this.add.group();
+                this.protectPlayer.enableBody = true;
+                this.protectPlayer.createMultiple(2,"protectPlayer");
+                this.protectPlayer.setAll("anchor.x",0.5);
+                this.protectPlayer.setAll("anchor.y",0.5);
+                this.protectPlayer.rotation += 0.5;
+                this.protectPlayer.setAll("hp",5,false,false,0,true);
+                this.protectPlayer.setAll("itemType","protect",false,false,0,true);
+                
+            this.enemyNormalBulletPool  = this.add.group();
+            this.enemyNormalBulletPool.enableBody = true;
+            this.enemyNormalBulletPool.createMultiple(50,"enemyNormalBullet");
+            this.enemyNormalBulletPool.setAll("outOfBoundsKill",true);
+            this.enemyNormalBulletPool.setAll("checkWorldBounds",true);
+            this.enemyNormalBulletPool.setAll("anchor.x",0.5);
+            this.enemyNormalBulletPool.setAll("anchor.y",0.5);
+            this.enemyNormalBulletPool.setAll("damage",AlienGame.ENEMY_CLASS.NORMAL_ENEMY.DAMAGE,false,false,0,true);
+            
+            this.enemyBigBulletPool = this.add.group();
+            this.enemyBigBulletPool.enableBody = true;
+            this.enemyBigBulletPool.createMultiple(40,"enemyBigBullet");
+       
+            this.enemyBigBulletPool.setAll("outOfBoundsKill",true);
+            this.enemyBigBulletPool.setAll("checkWorldBounds",true);
+            this.enemyBigBulletPool.setAll("anchor.x",0.5);
+            this.enemyBigBulletPool.setAll("anchor.y",0.5);
+            this.enemyBigBulletPool.setAll("damage",AlienGame.ENEMY_CLASS.BIG_ENEMY.DAMAGE,false,false,0,true);
+            
+    },
+    setEnemiesSmall : function(EnemyOb){
+  //enemy OB : enemy Object was created in boot.js 
+      this.enemySmallPool = this.add.group();
+      this.enemySmallPool.enableBody = true ;
+      this.enemySmallPool.createMultiple(100,EnemyOb.TYPE);
+      this.enemySmallPool.setAll("anchor.x",0.5);
+      this.enemySmallPool.setAll("anchor.y",0.5);
+      this.enemySmallPool.setAll("outOfBoundsKill",true);
+      this.enemySmallPool.setAll("checkWorldBounds",true);
+      this.enemySmallPool.setAll("score",EnemyOb.REWARD,false,false,0,true);
+      this.enemySmallPool.setAll("explosionSize",EnemyOb.EXPLOSION_SIZE,false,false,0,true);
+      this.enemySmallPool.forEach(function(e){
+        e.animations.add("fly",EnemyOb.ARRAY_ANIMATIONS,20,true);
+        e.animations.add("hit",EnemyOb.ARRAY_HIT_ANIMATIONS,20,false);
+        e.events.onAnimationComplete.add(function(e){
+            e.play("fly");
+        });
+      });
+     this.enemySmallPool.nextShotAt = 0 ;
+     this.enemySmallPool.spawnTime = this.time.now + EnemyOb.SPAWN_TIME;
+     this.enemySmallPool.targetPlayer = true ;
+    },
+    setEnemiesNormal : function(EnemyOb){
+  //enemy OB : enemy Object was created in boot.js 
+      this.enemyNormalPool = this.add.group();
+      this.enemyNormalPool.enableBody = true ;
+      this.enemyNormalPool.createMultiple(100,EnemyOb.TYPE);
+      this.enemyNormalPool.setAll("anchor.x",0.5);
+      this.enemyNormalPool.setAll("anchor.y",0.5);
+      this.enemyNormalPool.setAll("outOfBoundsKill",true);
+      this.enemyNormalPool.setAll("checkWorldBounds",true);
+      this.enemyNormalPool.setAll("score",EnemyOb.REWARD,false,false,0,true);
+      this.enemyNormalPool.setAll("explosionSize",EnemyOb.EXPLOSION_SIZE,false,false,0,true);
+      this.enemyNormalPool.forEach(function(e){
+        e.animations.add("fly",EnemyOb.ARRAY_ANIMATIONS,20,true);
+        e.animations.add("hit",EnemyOb.ARRAY_HIT_ANIMATIONS,20,false);
+        e.events.onAnimationComplete.add(function(e){
+            e.play("fly");
+        });
+      });
+     this.enemyNormalPool.nextShotAt = 0 ;
+     this.enemyNormalPool.shotDelay = EnemyOb.SHOT_DELAY;
+     this.enemyNormalPool.spawnTime = this.time.now + EnemyOb.SPAWN_TIME;
+     this.enemyNormalPool.bulletSpeed = EnemyOb.BULLET_SPEED;
+      
+    },
+    setEnemiesBig : function(EnemyOb){
+  //enemy OB : enemy Object was created in boot.js 
+      this.enemyBigPool = this.add.group();
+      this.enemyBigPool.enableBody = true ;
+      this.enemyBigPool.createMultiple(100,EnemyOb.TYPE);
+      this.enemyBigPool.setAll("anchor.x",0.5);
+      this.enemyBigPool.setAll("anchor.y",0.5);
+      this.enemyBigPool.setAll("outOfBoundsKill",true);
+      this.enemyBigPool.setAll("checkWorldBounds",true);
+      this.enemyBigPool.setAll("score",EnemyOb.REWARD,false,false,0,true);
+      this.enemyBigPool.setAll("explosionSize",EnemyOb.EXPLOSION_SIZE,false,false,0,true);
+      this.enemyBigPool.forEach(function(e){
+       e.animations.add("fly",EnemyOb.ARRAY_ANIMATIONS,20,true);
+        e.animations.add("hit",EnemyOb.ARRAY_HIT_ANIMATIONS,20,false);
+        e.events.onAnimationComplete.add(function(e){
+            e.play("fly");
+        });
+      });
+     this.enemyBigPool.nextShotAt = 0 ;
+     this.enemyBigPool.spawnTime = this.time.now + EnemyOb.SPAWN_TIME;
+     this.enemyBigPool.shotDelay = EnemyOb.SHOT_DELAY;
+     this.enemyBigPool.bulletSpeed = EnemyOb.BULLET_SPEED;
+    },
+    setExplosions : function(explosionType){
+      this.explosionPool = this.add.group();
+      this.explosionPool.enableBody = true;
+      this.explosionPool.createMultiple(100,explosionType);
+      this.explosionPool.setAll("anchor.x",0.5);
+      this.explosionPool.setAll("anchor.y",0.5);
+      this.explosionPool.setAll("outOfBoundsKill",true);
+      this.explosionPool.setAll("checkWorldBounds",true);
+      this.explosionPool.forEach(function(e){
+        e.animations.add("boom",[0,1,2,3,4],20);
+      });
+    },
+    setText : function(){
+     this.score = 0 ;
+     this.scoreText =  this.add.text(this.game.width/2,50,"0",{
+        font:"20px monospace ",
+        fill :"white"
+      });
+        
+//      this.scoreText.anchor.setTo(0.5,0.5);
+//        
+//        this.consoleText = this.add.text(100,100,,{
+//        font : "monospace 10px ",
+//        fill : "#fff"
+//      } );
+    },
+   
+    setPlayerIcon : function(){
+        this.bulletPoolItem = this.add.group();
+        this.bulletPoolItem.enableBody = true;
+        this.bulletPoolItem.createMultiple(10,'normalBullet');
+        this.bulletPoolItem.setAll("outOfBoundsKill",true);
+        this.bulletPoolItem.setAll("checkWorldBounds",true);
+        this.bulletPoolItem.setAll("itemType","spread",false,false,0,true);
+        
+        this.lazeBulletPoolItem = this.add.group();
+        this.lazeBulletPoolItem.enableBody = true ;
+        this.lazeBulletPoolItem.createMultiple(10,'lazeBullet');
+        this.lazeBulletPoolItem.setAll("outOfBoundsKill",true);
+        this.lazeBulletPoolItem.setAll("checkWorldBounds",true);
+        this.lazeBulletPoolItem.setAll("itemType","laze",false,false,0,true);
+        
+        this.missileBulletPoolItem = this.add.group();
+        this.missileBulletPoolItem.createMultiple(10,"missileBullet");
+        this.missileBulletPoolItem.enableBody = true ;
+        this.missileBulletPoolItem.setAll("checkWorldBounds",true);
+        this.missileBulletPoolItem.setAll("outOfBoundsKill",true);
+        this.missileBulletPoolItem.setAll("itemType","missile",false,false,0,true);
+        
+        this.supportPlayerPoolItem = this.add.group();
+         this.supportPlayerPoolItem.enableBody = true ;
+        this.supportPlayerPoolItem.createMultiple(10,"supportPlayer");
+        this.supportPlayerPoolItem.setAll("checkWorldBounds",true);
+        this.supportPlayerPoolItem.setAll("outOfBoundsKill",true);
+        this.supportPlayerPoolItem.setAll("itemType","support",false,false,0,true);
+    },
+    //UPDATE FUNCTION :
+    playerFire : function(){
+       switch(this.player.wegaponType){
+            case 0 : //dan mac dinh 
+        if(this.time.now < this.player.nextShotAt || !this.player.alive || this.bulletPool.countDead() <= 10 ) return ;
+             var bullet = this.bulletPool.getFirstDead();
+              bullet.reset(this.player.x , this.player.y - 20);
+              bullet.body.velocity.y = -AlienGame.PLAYER_CLASS.NORMAL_BULLET_FIRE_SPEED;
+                this.player.nextShotAt = this.time.now + AlienGame.PLAYER_CLASS.NORMAL_BULLET_FIRE_RATE ;
+            break;
+                
+            case 1 : //dan toa  
+       if(this.time.now < this.player.nextShotAt || !this.player.alive || this.bulletPool.countDead() <= 10 ) return;
+               
+            if(this.player.spreadBulletLevel > 1){
+                for(var i = 0; i<this.player.spreadBulletLevel;i++){
+                    var bullet =  this.bulletPool.getFirstDead();
+                        //left bullet nghieng ve ben trai cua player 
+                    //chú ý  , vì những viên đạn có thể va chạm với nhau => nếu để quá sát thì chúng sẽ va chạm trc khi kịp bắn -> lỗi ko bắn dc đạn ! 
+                       bullet.reset(this.player.x - (10 + i*5), this.player.y - 20);
+                        this.physics.arcade.velocityFromAngle(
+                            -95 - i*5 , 400,bullet.body.velocity
+                        );
+                    
+                         var bullet =  this.bulletPool.getFirstDead();
+                        //right bullet nghieng ben phai cua player 
+                            bullet.reset(this.player.x +(10+ i*5),this.player.y - 20);
+                            this.physics.arcade.velocityFromAngle(
+                                -85+i*5,400,bullet.body.velocity
+                            );
+                    }
+                    this.player.nextShotAt = this.time.now +100;
+//                        console.log("loai wegapon  :"  + this.player.wegaponType + "bullet velocity : " + bullet.body.velocity.y + "next shot at :" + this.player.nextShotAt + "this time now : " + this.time.now + "bullet y : " + bullet.y  );
+                }else{
+                    var bullet = this.bulletPool.getFirstDead();
+                        bullet.reset(this.player.x , this.player.y -20);
+                        bullet.body.velocity.y = -AlienGame.PLAYER_CLASS.NORMAL_BULLET_FIRE_SPEED;
+                    this.player.nextShotAt = this.time.now +100;
+                }
+                
+                break;
+                
+            case 2 : //dan laze :
+                if(this.time.now < this.player.nextShotAt || !this.player.alive || this.lazeBulletPool.countDead() <= 10 ) return;
+                        if(this.player.lazeBulletLevel > 1){
+                            for(var i =0 ;i<this.player.lazeBulletLevel ; i++){
+                                var bullet = this.lazeBulletPool.getFirstDead();
+                                    bullet.reset(this.player.x - (5+i*5) , this.player.y-30 );
+                                    bullet.body.velocity.y = -AlienGame.PLAYER_CLASS.LAZE_BULLET_FIRE_SPEED;
+                                
+                                var bullet = this.lazeBulletPool.getFirstDead();
+                                    bullet.reset(this.player.x +(5+i*5),this.player.y-30);
+                                    bullet.body.velocity.y = -AlienGame.PLAYER_CLASS.LAZE_BULLET_FIRE_SPEED;
+                            }
+                            this.player.nextShotAt = this.time.now + AlienGame.PLAYER_CLASS.LAZE_BULLET_FIRE_RATE;
+                        }else{
+                               var bullet = this.lazeBulletPool.getFirstDead();
+                                    bullet.reset(this.player.x,this.player.y -30);
+                                    bullet.body.velocity.y = -AlienGame.PLAYER_CLASS.MISSILE_BULLET_FIRE_RATE;
+                            this.player.nextShotAt = this.time.now + AlienGame.PLAYER_CLASS.LAZE_BULLET_FIRE_RATE; 
+                        }
+                
+                break;
+                
+            case 3 ://dan ten lua 
+                if(this.time.now < this.player.nextShotAt || !this.player.alive || this.missileBulletPool.countDead() <= 10 ) return;
+                    if(this.player.missileBulletLevel > 1){
+                        for(var i = 0; i<this.player.missileBulletLevel;i++){
+                            var bullet = this.missileBulletPool.getFirstDead();
+                                bullet.reset(this.player.x - 50 , this.player.y -20);
+                                bullet.body.velocity.y = -AlienGame.PLAYER_CLASS.MISSILE_BULLET_FIRE_SPEED;
+
+                            var bullet = this.missileBulletPool.getFirstDead();
+                                bullet.reset(this.player.x +50 , this.player.y - 20);
+                                bullet.body.velocity.y = -AlienGame.PLAYER_CLASS.MISSILE_BULLET_FIRE_SPEED;
+
+                        }
+                        this.player.nextShotAt = this.time.now + AlienGame.PLAYER_CLASS.MISSILE_BULLET_FIRE_RATE;
+                       }else{
+                            var bullet = this.missileBulletPool.getFirstDead();
+                                bullet.reset(this.player.x , this.player.y -20);
+                                bullet.body.velocity.y =-AlienGame.PLAYER_CLASS.MISSILE_BULLET_FIRE_RATE;
+                           this.player.nextShotAt = this.time.now + AlienGame.PLAYER_CLASS.MISSILE_BULLET_FIRE_RATE;
+                        }
+                
+            break;
+        }//end switch 
+         
+    },//endplayer fire 
+    checkCollision : function(ob1,ArrCollideWidthOthers,doSomething){
+        for(var i =0 ; i< ArrCollideWidthOthers.length ; i++){
+            this.physics.arcade.overlap(ob1,ArrCollideWidthOthers[i],doSomething,null,this);
+        }
+    },
+    spawnEnemies : function(enemyOb,enemyPool){
+                if(enemyPool.spawnTime > this.time.now || enemyPool.countDead() < 0) return;
+                var enemy = enemyPool.getFirstDead() ;
+               
+                enemy.play("fly");
+                enemyPool.spawnTime = this.time.now + enemyOb.SPAWN_TIME;
+        
+                if(!enemyPool.targetPlayer){
+                 enemy.reset(this.rnd.integerInRange(20,this.game.width - 20),0,enemyOb.HEALTH);
+                var targetX = this.rnd.integerInRange(20,this.game.width-20);
+                enemy.rotation = this.physics.arcade.moveToXY(
+                    enemy,targetX,this.game.height+10,this.rnd.integerInRange(enemyOb.MIN_SPEED,enemyOb.MAX_SPEED)
+                ) - Math.PI/2;
+                }else{
+                    enemy.reset(this.rnd.integerInRange(20,this.game.width - 20),0,enemyOb.HEALTH);
+                    this.physics.arcade.moveToObject(enemy,this.player,this.rnd.integerInRange(enemyOb.MIN_SPEED,enemyOb.MAX_SPEED));
+                }
+    },
+    enemyHit : function(ob1,ob2){
+      //hàm enemy hit này nhận tham số 1 cách tự động từ 2 đối tượng được truyền cho nó qua function : this.physics.arcade.overlap(ob1,ob2,doSomething,null,this) ! 
+    if(ob1.itemType === "laze"){
+            this.damageEnemy(ob2,ob1.bulletDamage);
+        }else{   
+        ob1.kill();
+             this.damageEnemy(ob2,ob1.bulletDamage);
+    }
+    },
+    damageEnemy : function(ob1,damage){
+        // ob1 la enemy bi hit 
+      ob1.health-=damage;
+        if(ob1.health < 0 ) ob1.alive = false;
+        if(ob1.alive){
+            ob1.play("hit");
+//            this.explode(ob1);
+        }else{
+             ob1.kill();
+            this.explode(ob1);
+            this.addToScore(ob1.score);
+            this.dropItem(ob1);
+            
+        }
+    },
+    enemyFire : function(){
+        
+            this.enemyNormalPool.forEachAlive(function(e){
+                if(this.time.now < e.nextShotAt || this.enemyNormalBulletPool.countDead() <= 0 ) return;
+                e.nextShotAt = this.time.now + this.enemyNormalPool.shotDelay;
+                var enemyNormalFire = this.enemyNormalBulletPool.getFirstDead();
+                    enemyNormalFire.reset(e.x,e.y);
+                this.physics.arcade.moveToObject(enemyNormalFire,this.player,AlienGame.ENEMY_CLASS.NORMAL_ENEMY.BULLET_SPEED);
+            },this);
+        
+            this.enemyBigPool.forEachAlive(function(e){
+                if(this.time.now < e.nextShotAt || this.enemyBigBulletPool.countDead() <= 0 ) return;
+                
+                e.nextShotAt = this.time.now + this.enemyBigPool.shotDelay ;
+                var enemyBigFire = this.enemyBigBulletPool.getFirstDead();
+                    enemyBigFire.reset(e.x,e.y);
+                this.physics.arcade.moveToObject(enemyBigFire,this.player,AlienGame.ENEMY_CLASS.BIG_ENEMY.BULLET_SPEED);
+            },this);
+    },
+    explode : function(ob){
+        var explosion = this.explosionPool.getFirstDead();
+            explosion.reset(ob.x,ob.y);
+            explosion.body.velocity.x = ob.body.velocity.x;
+            explosion.body.velocity.y = ob.body.velocity.y ;
+            explosion.scale.setTo(ob.explosionSize,ob.explosionSize);
+            explosion.play("boom",10,false,true);
+    },
+    dropItem : function(ob){
+        //ob la doi tuong enemy bi tan cong 
+      var rand = this.rnd.integerInRange(1,5);
+        if(this.bulletPoolItem.countDead() === 0  ||this.lazeBulletPoolItem.countDead()===0 || this.missileBulletPoolItem.countDead() ===0 ||this.supportPlayerPool.countDead() === 0) return;
+          if(rand <=2 ){//ti le la 20%
+              var rand2 = this.rnd.integerInRange(1,4);
+//              var rand2 = ;
+                switch(rand2){
+                    case 1 : //item 1 - đạn tỏa 
+                        var item = this.bulletPoolItem.getFirstDead();
+                        item.reset(ob.x,ob.y);
+                        this.physics.arcade.moveToObject(item,this.player,100);
+                    break;
+                        
+                    case 2 : //dan laze 
+        
+                        var item = this.lazeBulletPoolItem.getFirstDead();
+                            item.reset(ob.x,ob.y);
+                            this.physics.arcade.moveToObject(item,this.player,100);
+                    break;
+                        
+                    case 3 : //dan ten lua 
+                        var item = this.missileBulletPoolItem.getFirstDead();
+                            item.reset(ob.x,ob.y);
+                            this.physics.arcade.moveToObject(item,this.player,100);
+                        break;
+                        
+                    case 4 : //gọi 2 thằng đệ 
+                        var item = this.supportPlayerPoolItem.getFirstDead();
+                            item.reset(ob.x,ob.y);
+                            this.physics.arcade.moveToObject(item,this.player,100);
+                        break;
+                }
+          }
+    },
+    playerPowerUp : function(player,item){
+        switch(item.itemType){
+            case "spread":
+                this.player.wegaponType = 1;
+                this.player.spreadBulletLevel > this.player.spreadBulletMaxLevel ? this.player.spreadBulletLevel = this.player.spreadBulletMaxLevel : this.player.spreadBulletLevel++;
+                item.kill();
+                this.player.lazeBulletLevel = this.player.missileBulletLevel = 1 ;
+                break;
+                
+            case "laze":
+                this.player.wegaponType = 2 ; 
+                this.player.lazeBulletLevel > this.player.lazeBulletMaxLevel ? this.player.spreadBulletLevel = this.player.lazeBulleMaxtLevel :  this.player.lazeBulletLevel++; 
+                 item.kill();
+                this.player.spreadBulletLevel = this.player.missileBulletLevel = 1 ;
+            break;
+                
+            case "missile":
+                this.player.wegaponType = 3 ;
+                 item.kill();
+                this.player.missileBulletLevel > this.player.missileBulletMaxLevel ? this.player.missileBulletLevel = this.player.missileBulletMaxLevel : this.player.missileBulletLevel++;
+                this.player.lazeBulletLevel = this.player.spreadBulletLevel = 1 ;
+            break;
+            
+            case "support":
+                this.player.supportPlayerState = 0;
+                item.kill();
+            break;
+
+        }
+    },
+    addToScore : function(score){
+        this.score += score;
+        this.scoreText.text = this.score; 
+    },
+    otherEffect : function(){
+        //support player 
+        if(this.player.supportPlayerState === 1){
+            var supportLeft = this.supportPlayerPool.getAt(0);
+                supportLeft.reset(this.player.x -30 ,this.player.y);
+            
+            var  supportRight = this.supportPlayerPool.getAt(1);
+                supportRight.reset(this.player.x + 30 ,this.player.y );
+            
+            for(var i =0 ; i<2;i++){
+               if(this.bulletPool.countDead() <= 2 || this.player.supportPlayerShotDelay > this.time.now ) return;
+                var support = this.supportPlayerPool.getAt(i);
+                var bullet = this.bulletPool.getFirstDead();
+                    bullet.reset(support.x + this.rnd.integerInRange(-10,10),support.y-10);
+                    bullet.body.velocity.y =-AlienGame.PLAYER_CLASS.NORMAL_BULLET_FIRE_SPEED;
+            }
+            this.player.supportPlayerShotDelay = this.time.now + AlienGame.PLAYER_CLASS.NORMAL_BULLET_FIRE_RATE;
+        }
+        if (this.player.supportPlayerState === 0){
+            this.player.supportPlayerState = 1;
+        }//end check supportPlayer 
+    }
+};
